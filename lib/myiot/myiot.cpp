@@ -5,22 +5,36 @@
 #include <ESP8266mDNS.h>
 // #include <PubSubClient.h>
 #include "FS.h"
+#include "WiFiManager.h"
+#include "ArduinoJson.h"
+
 
 namespace myiot
 {
+bool MYIOT_SAVE_CONFIG = false;
 
 // constructor
 Device::Device(String model)
 {
     this->model = model;
-    this->config = {};
 
-    WiFiClient espClient;
-    mqtt = *(new PubSubClient(espClient));
+
+    WiFiClient *espClient = new WiFiClient();
+    mqtt = *(new PubSubClient(*espClient)); // TODO make mqtt a pointer
+
+    String default_name = model + "-" + WiFi.macAddress().substring(12);
+    default_name.replace(":", "");
+    default_name.toLowerCase();
+
+    addConfig("name", 32, default_name.c_str());
+    addConfig("mqtt_host", 40, "openhabianpi.local");
+    addConfig("mqtt_port", 6, "1883");
+
 }
 
 // destructor
 Device::~Device() {}
+
 
 // addSensor()
 Sensor &Device::addSensor(String name, uint8 pin)
@@ -39,12 +53,36 @@ void Device::addSensor(Sensor &s)
     sensors.push_back(s);
 }
 
+void Device::addConfig(String name, size_t size, String default_value)
+{
+    myiot_config* cfg = new myiot_config();
+
+    cfg->size = size;
+    cfg->default_value = default_value;
+    cfg->value = new char[size];
+    strcpy(cfg->value, default_value.c_str());
+    cfg->wifi_parameter = NULL;
+
+    config[name] = cfg;
+}
+
+char* Device::getConfig(String name)
+{
+    auto it = config.find(name);
+    if (it == config.end())
+        Serial.printf("[ERROR] invalid config '%s'\n", name.c_str());
+
+    return it->second->value;
+}
+
 // setup()
 void Device::setup()
 {
     // setup serial
-    if (!config.disable_serial)
-        initSerial();
+    initSerial();
+
+    // dev only
+    // wifi_manager.resetSettings();
 
     // load config
     initConfig();
@@ -52,140 +90,175 @@ void Device::setup()
     // wifi
     initWiFi();
 
-    // mqtt
-
 
     // TODO web server
 
     // setup sensors
-    Serial.printf("Sensors: %d\n", (int)sensors.size());
-    for (std::size_t i = 0; i < sensors.size(); i++)
-        sensors[i].setup();
-
-    // sensible defaults
-    if (config.loop_delay == 0)
-        config.loop_delay = 1000;
+    // Serial.printf("Sensors: %d\n", (int)sensors.size());
+    // for (std::size_t i = 0; i < sensors.size(); i++)
+    //     sensors[i].setup();
 }
 
 void Device::initSerial()
 {
-    delay(500);
+    delay(1000);
     Serial.begin(9600);
     Serial.println("\nMyIOT started!");
-}
-
-void load_config(const char *file_name, String &target)
-{
-
-    // not exists
-    if (!SPIFFS.exists(file_name))
-    {
-        Serial.printf("[Config] undefined: %s\n", file_name);
-        return;
-    }
-
-    File file = SPIFFS.open(file_name, "r");
-    if (!file)
-    {
-        Serial.printf("[ERROR] Could not open file '%s'\n", file_name);
-        return;
-    }
-
-    target = file.readString();
-    Serial.printf("[Config] loaded %s (%s)\n", file_name, target.c_str());
 }
 
 void Device::initConfig()
 {
 
-    SPIFFS.begin();
-    load_config("/wifi.ssid", config.wifi_ssid);
-    load_config("/wifi.password", config.wifi_password);
-    load_config("/mqtt.host", config.mqtt_host);
-    load_config("/mqtt.port", config.mqtt_port);
-    load_config("/Device.name", config.name);
-
-    // set defaults
-
-    // name based on mac address
-    if (config.name == "")
+    // mount fs
+    if (!SPIFFS.begin())
     {
-        String suffix = WiFi.macAddress().substring(12);
-        suffix.replace(":", "");
-        suffix.toLowerCase();
-        config.name = this->model + "-" + suffix;
+        Serial.println("[ERROR] error mounting file system.");
+        return;
     }
 
-    // loop_delay
+    // load existing config
+    if (SPIFFS.exists("/config.json"))
+    {
+        Serial.println("[Config] reading config file");
+        File configFile = SPIFFS.open("/config.json", "r");
+        if (configFile) {
+            Serial.println("opened config file");
+            size_t size = configFile.size();
+            std::unique_ptr<char[]> buf(new char[size]);
+            configFile.readBytes(buf.get(), size);
+            DynamicJsonBuffer jsonBuffer;
+            JsonObject& json = jsonBuffer.parseObject(buf.get());
+            json.printTo(Serial);
+            if (json.success()) {
+                Serial.println("\nparsed json");
+                for (auto it = config.begin(); it != config.end(); ++it)
+                {
+                    auto cfg = it->second;
+                    if (json.containsKey(it->first))
+                        strcpy(cfg->value, json[it->first]);
+                };
+
+            } else {
+                Serial.println("failed to load json config");
+            }
+            configFile.close();
+        }
+    }
+
+    // create wifi parameters
+    // NOTE new config values wont be reflected on webadmin
+    for (auto it = config.begin(); it != config.end(); ++it)
+    {
+        auto cfg = it->second;
+        cfg->wifi_parameter = new WiFiManagerParameter(it->first.c_str(), cfg->default_value.c_str(), cfg->value, cfg->size);
+    };
+
 
     Serial.println("==== Current config ====");
-    Serial.printf("> name: %s\n", config.name.c_str());
-    Serial.printf("> wifi_ssid: %s\n", config.wifi_ssid.c_str());
-    Serial.printf("> wifi_password: %s\n", config.wifi_password.c_str());
-    Serial.printf("> mqtt_host: %s\n", config.mqtt_host.c_str());
-    Serial.printf("> mqtt_port: %s\n", config.mqtt_port.c_str());
-    Serial.printf("> loop_delay: %d\n", config.loop_delay);
+    for (auto it = config.begin(); it != config.end(); ++it)
+    {
+        Serial.printf("> %s: %s\n", it->first.c_str(), it->second->value);
+    };
+}
+
+void Device::saveConfig()
+{
+
+    DynamicJsonBuffer jsonBuffer;
+    JsonObject& json = jsonBuffer.createObject();
+
+    for (auto it = config.begin(); it != config.end(); it++)
+    {
+        auto cfg = it->second;
+        json[it->first] = cfg->value;
+    }
+
+    File configFile = SPIFFS.open("/config.json", "w");
+    if (!configFile) {
+        Serial.println("failed to open config file for writing");
+    }
+
+    Serial.println("[Config] saving config: ");
+    json.printTo(Serial);
+    Serial.println("");
+
+    json.printTo(configFile);
+    configFile.close();
+
+    MYIOT_SAVE_CONFIG = false;
 }
 
 void Device::initWiFi()
 {
 
     // init
-    delay(500);
     Serial.println("[WiFi] Initializing...");
-    Serial.println("[WiFi] SSID: " + config.wifi_ssid);
+    Serial.println("[WiFi] SSID: " + WiFi.SSID());
     Serial.println("[WiFi] MAC: " + WiFi.macAddress());
 
     // mDNS
-    if (MDNS.begin(config.name.c_str()))
-        Serial.println("[WiFi] mDNS host: " + config.name + ".local");
+    if (MDNS.begin(getConfig("name")))
+        Serial.printf("[WiFi] mDNS host: %s.local\n", getConfig("name"));
     else
         Serial.println("[WiFi] Error setting up mDNS responder!");
-}
 
+
+    // portal timeout
+    wifi_manager.setTimeout(180);
+
+    // add config parameters
+    for (auto it = config.begin(); it != config.end(); ++it)
+    {
+        auto cfg = it->second;
+        wifi_manager.addParameter(cfg->wifi_parameter);
+    };
+
+    wifi_manager.setSaveConfigCallback([]() -> void {
+        MYIOT_SAVE_CONFIG = true;
+    });
+}
 
 void Device::reconnectWiFi()
 {
     if (WiFi.status() == WL_CONNECTED)
         return;
 
-    // TODO check for empty wifi config
-
-    Serial.printf("[WiFi] Connecting to '%s' ", config.wifi_ssid.c_str());
-    WiFi.begin(config.wifi_ssid.c_str(), config.wifi_password.c_str());
-
-    while (WiFi.status() != WL_CONNECTED)
-    {
-        delay(100);
-        Serial.print(".");
-        // TODO implement timeout
+    if(!wifi_manager.autoConnect(getConfig("name"))) {
+        Serial.println("[WiFi] managet autoConnect() timedout.");
+        delay(3000);
     }
-
-    Serial.println(" connected!");
-    Serial.println("[WiFi] IP: " + WiFi.localIP().toString());
+    else
+    {
+        Serial.println("[WiFi] Connected! IP: " + WiFi.localIP().toString());
+        for (auto it = config.begin(); it != config.end(); it++)
+        {
+            auto cfg = it->second;
+            strcpy(cfg->value, cfg->wifi_parameter->getValue());
+        }
+    }
 }
 
 void Device::reconnectMQTT()
 {
-    if (this->mqtt.connected()) return;
+    if (mqtt.connected()) return;
 
-    delay(100);
 
-    this->mqtt.setServer(config.mqtt_host.c_str(), 1883);
-    Serial.printf("[MQTT] Connecting to '%s' ... ", config.mqtt_host.c_str());
+    // this->mqtt.setServer(config.mqtt_host.c_str(), 1883);
+    // Serial.printf("[MQTT] Connecting to '%s' ... ", config.mqtt_host.c_str());
 
-    if (this->mqtt.connect(config.name.c_str()))
-    {
+    // if (this->mqtt.connect(config.name.c_str()))
+    // {
 
-        Serial.printf("connected\n");
-        Serial.printf("[MQTT] client id: %s\n", config.name.c_str());
-        // MQTT.subscribe(cmd_topic.c_str());
-    }
-    else
-    {
-        Serial.printf("error: %d\n", this->mqtt.state());
-    }
+    //     Serial.printf("connected\n");
+    //     Serial.printf("[MQTT] client id: %s\n", config.name.c_str());
+    //     // MQTT.subscribe(cmd_topic.c_str());
+    // }
+    // else
+    // {
+    //     Serial.printf("error: %d\n", this->mqtt.state());
+    // }
 }
+
 } // namespace myiot
 
 void myiot::Device::readSensors()
@@ -200,36 +273,32 @@ void myiot::Device::readSensors()
         if (!s.canRead()) continue;
 
         // read
-        auto value = s.read();
-        Serial.printf("[Sensor] %s: %s\n", s.name.c_str(), value.c_str());
+        // auto value = s.read();
+        // Serial.printf("[Sensor] %s: %s\n", s.name.c_str(), value.c_str());
 
-        // publish
-        if (mqtt.connected())
-        {
-            // raw
-            String topic = "stat/" + config.name + "/" + s.name;
-            mqtt.publish(topic.c_str(), value.c_str());
+        // // publish
+        // if (mqtt.connected())
+        // {
+        //     // raw
+        //     String topic = "stat/" + config.name + "/" + s.name;
+        //     mqtt.publish(topic.c_str(), value.c_str());
 
-            // json
-            if (config.mqtt_publish_json)
-            {
-                String json_payload = "{ \"value\": " + value + " }";
-                mqtt.publish((topic + "/json").c_str(), json_payload.c_str());
-            }
-        }
+        //     // json
+        //     if (config.mqtt_publish_json)
+        //     {
+        //         String json_payload = "{ \"value\": " + value + " }";
+        //         mqtt.publish((topic + "/json").c_str(), json_payload.c_str());
+        //     }
+        // }
     }
 }
 
 void myiot::Device::loop()
 {
-    // loop delay
-    if (millis() - last_loop < config.loop_delay)
-        return;
-
-    last_loop = millis();
-
-    // loop routines
     reconnectWiFi();
-    reconnectMQTT();
-    readSensors();
+    // reconnectMQTT();
+    // readSensors();
+
+    if (MYIOT_SAVE_CONFIG)
+        saveConfig();
 }

@@ -1,56 +1,37 @@
 #include <Arduino.h>
 #include "myiot.h"
-#include <Adafruit_Sensor.h>
-#include "DHT.h"
-
-#define MODEL "ipcc"
-#define LDRPIN A0
-#define DHTPIN D4
+// #include <Adafruit_Sensor.h>
+// #include "DHT.h"
 
 
-myiot::Device device(MODEL);
+myiot::Device device("myiot");
 
+myiot::Button btn("flashBtn", 0);
 
 void setup()
 {
-
-    // default config
-    device.config.wifi_ssid = "VIVO-26E0";
-    device.config.wifi_password = "32359498";
-    device.config.mqtt_host = "openhabianpi.local";
-    device.config.mqtt_port = "1883";
-    device.config.loop_delay = 100;
-    device.config.name = "ipcc";
-    // device.config.disable_serial = true;
-
-
-    // temperature sensor
-    DHT *dht = new DHT(DHTPIN, DHT22);
-
-    device.addSensor("temperature", [dht]() -> String {
-        return String(dht->readTemperature());
-    });
-
-    // humidity sensor
-    device.addSensor("humidity", [dht]() -> String {
-        return String(dht->readHumidity());
-    });
-
-    // light sensor
-    auto light_sensor = device.addSensor("light", [dht]() -> String {
-        auto val = analogRead(LDRPIN);
-        return String(val);
-    });
-
-    light_sensor.pin = LDRPIN;
-    light_sensor.is_analog = true;
+    device.addConfig("custom_cfg", 40, "waravalue");
 
     device.setup();
+    btn.setup();
 
 
+    btn.onClicks(1, []() -> void {
+        Serial.println("Click handler");
+    });
+
+    // btn.onClicks(2, [](){ Serial.println("Clicked 2"); });
+    // btn.onClicks(3, [](){ Serial.println("Clicked 3"); });
+
+
+    // ESP.reset();
+    // wifiManager.resetSettings();
+    // wifiManager.autoConnect("wara");
 }
 
 void loop()
 {
     device.loop();
+    btn.loop();
+
 }

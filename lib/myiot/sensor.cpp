@@ -5,7 +5,7 @@ myiot::Sensor::Sensor(String n, uint8 p)
     name = n;
     pin = p;
     is_analog = false;
-    read_interval = 1000 * 5;
+    read_interval = 1000 * 15;
 
     reader = [this]() -> String {
         return String(is_analog ? analogRead(pin) : digitalRead(pin));
@@ -17,7 +17,7 @@ myiot::Sensor::Sensor(String name, std::function<String()> reader)
     this->name = name;
     this->reader = reader;
 
-    read_interval = 1000 * 5;
+    read_interval = 1000 * 15;
 }
 
 myiot::Sensor::~Sensor()
