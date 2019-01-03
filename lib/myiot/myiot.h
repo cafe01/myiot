@@ -4,6 +4,9 @@
 #include "Arduino.h"
 #include "PubSubClient.h"
 #include "WiFiManager.h"
+#include "ticker.h"
+#include "input.h"
+#include "sensor.h"
 
 struct myiot_config
 {
@@ -17,7 +20,9 @@ namespace myiot
 {
 
 
-class Sensor;
+
+
+
 
 class Device
 {
@@ -26,6 +31,7 @@ class Device
     WiFiManager wifi_manager;
 
     std::vector<Sensor> sensors;
+    std::vector<Input*> inputs;
     PubSubClient mqtt;
 
     void initSerial();
@@ -46,11 +52,16 @@ class Device
 
     void setup();
     void loop();
+
     void addConfig(String name, size_t size, String default_value);
     char* getConfig(String name);
+
     void addSensor(Sensor &s);
     Sensor &addSensor(String name, uint8 pin);
     Sensor &addSensor(String name, std::function<String()>);
+
+    Input& addInput(const char* name, uint8_t pin, uint8_t pin_mode = INPUT);
+
     void readSensors();
 
 }; // Device
@@ -58,52 +69,31 @@ class Device
 
 
 
-class Sensor
-{
-  private:
-    int last_read;
-    String current_value;
 
-  public:
-    String name;
-    uint8 pin;
-    bool is_analog;
-    bool is_pullup;
-    unsigned int read_interval;
-    std::function<String()> reader;
 
-    Sensor(String name, uint8 pin);
-    Sensor(String name, std::function<String()> reader);
-    ~Sensor();
-
-    void setup();
-    bool canRead();
-    String value();
-    String read();
-    void mqtt_publish(PubSubClient &mqtt);
-}; // Sensor
-
-class Button
+class Button : public Input
 {
   private:
     /* data */
-    String name;
-    uint8_t pin;
-    uint8_t input_mode;
-    bool is_pullup;
-    // bool is_internal_pullup;
-    std::map<uint8_t, std::function<void()>> click_callbacks;
-    bool is_down;
-    unsigned long last_down;
-    unsigned long last_up;
+    // String name;
+    // uint8_t pin;
+    // uint8_t input_mode;
+    // bool is_pullup;
+    // // bool is_internal_pullup;
+    // std::map<uint8_t, std::function<void()>> click_callbacks;
+    // bool is_down;
+    // unsigned long last_down;
+    // unsigned long last_up;
 
-    uint8_t pending_clicks;
+    // uint8_t pending_clicks;
   public:
-    Button(String name, uint8_t pin);
-    Button(String name, uint8_t pin, uint8_t mode);
-    void setup();
-    void onClicks(uint8_t number_of_clicks, std::function<void()> callback);
-    void loop();
+    Button(const char* name, uint8_t pin, uint8_t pin_mode = INPUT) : Input(name, pin, pin_mode)
+    {
+        is_button = true;
+    }
+    // void setup();
+    // void onClicks(uint8_t number_of_clicks, std::function<void()> callback);
+    // void loop();
 }; // Button
 
 } // namespace myiot

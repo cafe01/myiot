@@ -13,6 +13,9 @@ namespace myiot
 {
 bool MYIOT_SAVE_CONFIG = false;
 
+
+
+
 // constructor
 Device::Device(String model)
 {
@@ -295,10 +298,15 @@ void myiot::Device::readSensors()
 
 void myiot::Device::loop()
 {
+    if (MYIOT_SAVE_CONFIG) saveConfig();
+
     reconnectWiFi();
     // reconnectMQTT();
     // readSensors();
 
-    if (MYIOT_SAVE_CONFIG)
-        saveConfig();
+    // inputs
+    for (size_t i = 0; i < inputs.size(); i++)
+    {
+        inputs[i]->loop();
+    }
 }
