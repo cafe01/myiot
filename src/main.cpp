@@ -11,12 +11,7 @@ myiot::Device device("myiot");
 // myiot::Input analog_input("test_analog_input", A0);
 
 
-// myiot::Button btn("flashBtn", 0);
 
-void foo();
-
-
-Ticker t1(1000, foo);
 
 void setup()
 {
@@ -24,11 +19,16 @@ void setup()
     device.addConfig("custom_cfg", 40, "waravalue");
 
     // inputs
-    // auto digital = device.addInput("test_digital", D2);
+    auto digital = device.addInput("test_digital", 0);
+    digital->on_change = [](Input& input) -> void {
+        Serial.printf("[cb] input %s changed to %d\n", input.getName(), input.value);
+    };
+
+
+
 
     // setup
     device.setup();
-    t1.start();
 
 
 
@@ -48,19 +48,5 @@ void setup()
 void loop()
 {
     device.loop();
-    t1.loop();
-
-    if (t1.getCount() == 5)
-    {
-        t1.setInterval(250);
-    }
-
-    if (t1.getCount() == 15) t1.stop();
-
 }
 
-
-void foo()
-{
-    Serial.printf("%d Done foo!\n", (int)t1.getCount());
-}

@@ -38,6 +38,14 @@ Device::Device(String model)
 // destructor
 Device::~Device() {}
 
+// addInput()
+Input* Device::addInput(const char* name, uint8_t pin, uint8_t pin_mode /* = INPUT */)
+{
+    auto input = new Input(name, pin, pin_mode);
+    inputs.push_back(input);
+    return input;
+}
+
 
 // addSensor()
 Sensor &Device::addSensor(String name, uint8 pin)
@@ -92,6 +100,12 @@ void Device::setup()
 
     // wifi
     initWiFi();
+
+    // inputs
+    for (size_t i = 0; i < inputs.size(); i++)
+    {
+        inputs[i]->setup();
+    }
 
 
     // TODO web server

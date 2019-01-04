@@ -1,12 +1,14 @@
-
+#pragma once
 #include <vector>
 #include <map>
 #include "Arduino.h"
 #include "PubSubClient.h"
 #include "WiFiManager.h"
 #include "ticker.h"
+#include "button.h"
 #include "input.h"
 #include "sensor.h"
+
 
 struct myiot_config
 {
@@ -16,12 +18,9 @@ struct myiot_config
     WiFiManagerParameter* wifi_parameter;
 };
 
+
 namespace myiot
 {
-
-
-
-
 
 
 class Device
@@ -60,7 +59,7 @@ class Device
     Sensor &addSensor(String name, uint8 pin);
     Sensor &addSensor(String name, std::function<String()>);
 
-    Input& addInput(const char* name, uint8_t pin, uint8_t pin_mode = INPUT);
+    Input* addInput(const char* name, uint8_t pin, uint8_t pin_mode = INPUT);
 
     void readSensors();
 
@@ -69,32 +68,6 @@ class Device
 
 
 
-
-
-class Button : public Input
-{
-  private:
-    /* data */
-    // String name;
-    // uint8_t pin;
-    // uint8_t input_mode;
-    // bool is_pullup;
-    // // bool is_internal_pullup;
-    // std::map<uint8_t, std::function<void()>> click_callbacks;
-    // bool is_down;
-    // unsigned long last_down;
-    // unsigned long last_up;
-
-    // uint8_t pending_clicks;
-  public:
-    Button(const char* name, uint8_t pin, uint8_t pin_mode = INPUT) : Input(name, pin, pin_mode)
-    {
-        is_button = true;
-    }
-    // void setup();
-    // void onClicks(uint8_t number_of_clicks, std::function<void()> callback);
-    // void loop();
-}; // Button
 
 } // namespace myiot
 

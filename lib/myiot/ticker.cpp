@@ -3,9 +3,9 @@
 namespace myiot
 {
 
-Ticker::Ticker(unsigned long i, std::function<void()> c) : interval(i), callback(c)
+Ticker::Ticker(unsigned long i, bool e) : interval(i), is_enabled(e)
 {
-    stop();
+    last_run = 0;
 }
 
 void Ticker::loop()

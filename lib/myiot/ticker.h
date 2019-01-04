@@ -1,3 +1,4 @@
+#pragma once
 #include <Arduino.h>
 
 namespace myiot
@@ -8,11 +9,13 @@ class Ticker
 private:
     unsigned long last_run;
     unsigned long count;
-    bool is_enabled;
     unsigned long interval;
-    std::function<void()> callback;
+    bool is_enabled;
+
 public:
-    Ticker(unsigned long, std::function<void()>);
+    std::function<void()> callback;
+
+    Ticker(unsigned long interval, bool is_enabled);
     void loop();
 
     unsigned long getCount() {
