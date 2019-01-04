@@ -22,7 +22,7 @@ class Button : public Input
 
     // uint8_t pending_clicks;
   public:
-    Button(const char* name, uint8_t pin, uint8_t pin_mode = INPUT) : Input(name, pin, pin_mode)
+    Button(const char* name, uint8_t pin) : Input(name, pin)
     {
         is_button = true;
     }

@@ -36,9 +36,9 @@ Device::Device(String model)
 
 
 // addInput()
-Input* Device::addInput(const char* name, uint8_t pin, uint8_t pin_mode /* = INPUT */)
+Input* Device::addInput(const char* name, uint8_t pin)
 {
-    auto input = new Input(name, pin, pin_mode);
+    auto input = new Input(name, pin);
     inputs.push_back(input);
     return input;
 }
@@ -79,7 +79,9 @@ Ticker* Device::addTicker(unsigned long interval, std::function<void()> callback
 void Device::setup()
 {
     // setup serial
-    initSerial();
+    delay(1000);
+    Serial.begin(9600);
+    Serial.println("\nMyIOT started!");
 
     // dev only
     // wifi_manager.resetSettings();
@@ -102,12 +104,6 @@ void Device::setup()
     addTicker(100, [this]() -> void { this->saveConfig(); });
 }
 
-void Device::initSerial()
-{
-    delay(1000);
-    Serial.begin(9600);
-    Serial.println("\nMyIOT started!");
-}
 
 void Device::initConfig()
 {
@@ -250,17 +246,30 @@ void Device::reconnectMQTT()
     mqtt.setServer(host, 1883);
     Serial.printf("[MQTT] Connecting to '%s' ... ", host);
 
-    // if (this->mqtt.connect(config.name.c_str()))
-    // {
+    if (mqtt.connect(host))
+    {
 
-    //     Serial.printf("connected\n");
-    //     Serial.printf("[MQTT] client id: %s\n", config.name.c_str());
-    //     // MQTT.subscribe(cmd_topic.c_str());
-    // }
-    // else
-    // {
-    //     Serial.printf("error: %d\n", this->mqtt.state());
-    // }
+        Serial.printf("connected\n");
+        Serial.printf("[MQTT] client id: %s\n", host);
+        // MQTT.subscribe(cmd_topic.c_str());
+    }
+    else
+    {
+        Serial.printf("error: %d\n", mqtt.state());
+    }
+}
+
+void Device::publishInput(Input* input, bool retained)
+{
+    if (!mqtt.connected())
+    {
+        Serial.println("[MQTT] publishInput skipped (mqtt is disconnected)");
+        return;
+    }
+    String topic = "stat/" + String(getConfig("name")) + "/" + String(input->getName());
+    String payload = input->to_string();
+    Serial.printf("[MQTT] publishing to '%s': '%s'\n", topic.c_str(), payload.c_str());
+    mqtt.publish(topic.c_str(), payload.c_str(), retained);
 }
 
 // loop

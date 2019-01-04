@@ -4,7 +4,7 @@ namespace myiot
 {
 
 
-Input::Input(const char* n, uint8_t p, uint8_t m = 0) : pin(p), pin_mode(m)
+Input::Input(const char* n, uint8_t p) : pin(p)
 {
     // copy hardcoded char into string
     this->name = (new String(n))->c_str();
@@ -21,8 +21,6 @@ Input::Input(const char* n, uint8_t p, uint8_t m = 0) : pin(p), pin_mode(m)
 
 void Input::setup()
 {
-    pinMode(pin, pin_mode);
-
     // default read_int
     if (!(read_int || read_float))
     {
@@ -42,13 +40,6 @@ void Input::setup()
                 return String(read_int());
         };
     }
-
-    // onchange
-    if (!on_change)
-    {
-        Serial.printf("[WARNING] input %s has no on_change\n", name);
-    }
-
 }
 
 void Input::loop()
@@ -90,10 +81,10 @@ template<typename T> void Input::_loop(T* value, std::function<T()> reader)
     Serial.printf("[Input] %s = %.2f\n", name, (float)read_value);
 
     // trigger on_change
-    if (this->on_change)
+    for (size_t i = 0; i < on_change.size(); ++i)
     {
-        // Serial.println("calling input on_change");
-        on_change(*this);
+        Serial.printf("[Input:%s] calling callback %d for", name, i);
+        on_change[i](*this);
     }
 }
 

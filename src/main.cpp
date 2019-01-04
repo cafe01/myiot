@@ -16,13 +16,21 @@ myiot::Device device("myiot");
 void setup()
 {
     // custom config
-    device.addConfig("custom_cfg", 40, "waravalue");
+    // device.addConfig("custom_cfg", 40, "waravalue");
 
     // inputs
     auto digital = device.addInput("test_digital", 0);
-    digital->on_change = [](Input& input) -> void {
+    auto dev = &device;
+
+    digital->onChange([dev](Input& input) -> void {
         Serial.printf("[cb] input %s changed to %d\n", input.getName(), input.value);
-    };
+        dev->publishInput(&input, true);
+
+    });
+
+    device.addTicker(10000, [dev, digital]() -> void {
+        dev->publishInput(digital);
+    });
 
 
 

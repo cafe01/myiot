@@ -35,17 +35,16 @@ class Device
 
     std::vector<Ticker*> tickers;
 
-    void initSerial();
     void initConfig();
     void saveConfig();
     void initWiFi();
     void initMQTT();
 
+    void reconnectWiFi();
+    void reconnectMQTT();
   public:
     std::map<String, myiot_config*> config;
 
-    void reconnectWiFi();
-    void reconnectMQTT();
 
     Device(String model);
 
@@ -55,8 +54,10 @@ class Device
     void addConfig(String name, size_t size, String default_value);
     char* getConfig(String name);
 
-    Input* addInput(const char* name, uint8_t pin, uint8_t pin_mode = INPUT);
+    Input* addInput(const char* name, uint8_t pin);
     Ticker* addTicker(unsigned long interval, std::function<void()> callback);
+
+    void publishInput(Input*, bool retained = false);
 
 
 }; // Device
