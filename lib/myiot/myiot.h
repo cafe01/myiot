@@ -29,25 +29,25 @@ class Device
     String model;
     WiFiManager wifi_manager;
 
-    std::vector<Sensor> sensors;
+    // std::vector<Sensor> sensors;
     std::vector<Input*> inputs;
     PubSubClient mqtt;
+
+    std::vector<Ticker*> tickers;
 
     void initSerial();
     void initConfig();
     void saveConfig();
     void initWiFi();
-    void reconnectWiFi();
     void initMQTT();
-    void reconnectMQTT();
 
   public:
-    // myiot_config config;
     std::map<String, myiot_config*> config;
 
+    void reconnectWiFi();
+    void reconnectMQTT();
+
     Device(String model);
-    // Device(String model, myiot_config default_config);
-    ~Device();
 
     void setup();
     void loop();
@@ -55,13 +55,9 @@ class Device
     void addConfig(String name, size_t size, String default_value);
     char* getConfig(String name);
 
-    void addSensor(Sensor &s);
-    Sensor &addSensor(String name, uint8 pin);
-    Sensor &addSensor(String name, std::function<String()>);
-
     Input* addInput(const char* name, uint8_t pin, uint8_t pin_mode = INPUT);
+    Ticker* addTicker(unsigned long interval, std::function<void()> callback);
 
-    void readSensors();
 
 }; // Device
 

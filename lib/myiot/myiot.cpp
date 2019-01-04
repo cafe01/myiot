@@ -7,13 +7,12 @@
 #include "FS.h"
 #include "WiFiManager.h"
 #include "ArduinoJson.h"
-
+#include "ticker.h"
 
 namespace myiot
 {
+
 bool MYIOT_SAVE_CONFIG = false;
-
-
 
 
 // constructor
@@ -35,8 +34,6 @@ Device::Device(String model)
 
 }
 
-// destructor
-Device::~Device() {}
 
 // addInput()
 Input* Device::addInput(const char* name, uint8_t pin, uint8_t pin_mode /* = INPUT */)
@@ -46,24 +43,7 @@ Input* Device::addInput(const char* name, uint8_t pin, uint8_t pin_mode /* = INP
     return input;
 }
 
-
-// addSensor()
-Sensor &Device::addSensor(String name, uint8 pin)
-{
-    sensors.resize(sensors.size() + 1, {name, pin});
-    return sensors.back();
-}
-Sensor &Device::addSensor(String name, std::function<String()> reader)
-{
-    sensors.resize(sensors.size() + 1, {name, reader});
-    return sensors.back();
-}
-void Device::addSensor(Sensor &s)
-{
-    sensors.reserve(sensors.size() + 1);
-    sensors.push_back(s);
-}
-
+// addConfig()
 void Device::addConfig(String name, size_t size, String default_value)
 {
     myiot_config* cfg = new myiot_config();
@@ -77,6 +57,7 @@ void Device::addConfig(String name, size_t size, String default_value)
     config[name] = cfg;
 }
 
+// getConfig()
 char* Device::getConfig(String name)
 {
     auto it = config.find(name);
@@ -84,6 +65,14 @@ char* Device::getConfig(String name)
         Serial.printf("[ERROR] invalid config '%s'\n", name.c_str());
 
     return it->second->value;
+}
+
+Ticker* Device::addTicker(unsigned long interval, std::function<void()> callback)
+{
+    auto ticker = new Ticker(interval, true);
+    ticker->callback = callback;
+    tickers.push_back(ticker);
+    return ticker;
 }
 
 // setup()
@@ -107,13 +96,10 @@ void Device::setup()
         inputs[i]->setup();
     }
 
-
-    // TODO web server
-
-    // setup sensors
-    // Serial.printf("Sensors: %d\n", (int)sensors.size());
-    // for (std::size_t i = 0; i < sensors.size(); i++)
-    //     sensors[i].setup();
+    // loop tasks
+    addTicker(1000, [this]() -> void { this->reconnectWiFi(); });
+    addTicker(1000, [this]() -> void { this->reconnectMQTT(); });
+    addTicker(100, [this]() -> void { this->saveConfig(); });
 }
 
 void Device::initSerial()
@@ -180,6 +166,7 @@ void Device::initConfig()
 
 void Device::saveConfig()
 {
+    if (!MYIOT_SAVE_CONFIG) return;
 
     DynamicJsonBuffer jsonBuffer;
     JsonObject& json = jsonBuffer.createObject();
@@ -259,9 +246,9 @@ void Device::reconnectMQTT()
 {
     if (mqtt.connected()) return;
 
-
-    // this->mqtt.setServer(config.mqtt_host.c_str(), 1883);
-    // Serial.printf("[MQTT] Connecting to '%s' ... ", config.mqtt_host.c_str());
+    auto host = getConfig("mqtt_host");
+    mqtt.setServer(host, 1883);
+    Serial.printf("[MQTT] Connecting to '%s' ... ", host);
 
     // if (this->mqtt.connect(config.name.c_str()))
     // {
@@ -276,51 +263,20 @@ void Device::reconnectMQTT()
     // }
 }
 
-} // namespace myiot
-
-void myiot::Device::readSensors()
+// loop
+void Device::loop()
 {
-    // Serial.printf("Reading %d sensors:\n", sensors.size());
-
-    for (std::size_t i = 0; i < sensors.size(); i++)
-    {
-
-        Sensor &s = sensors[i];
-
-        if (!s.canRead()) continue;
-
-        // read
-        // auto value = s.read();
-        // Serial.printf("[Sensor] %s: %s\n", s.name.c_str(), value.c_str());
-
-        // // publish
-        // if (mqtt.connected())
-        // {
-        //     // raw
-        //     String topic = "stat/" + config.name + "/" + s.name;
-        //     mqtt.publish(topic.c_str(), value.c_str());
-
-        //     // json
-        //     if (config.mqtt_publish_json)
-        //     {
-        //         String json_payload = "{ \"value\": " + value + " }";
-        //         mqtt.publish((topic + "/json").c_str(), json_payload.c_str());
-        //     }
-        // }
+    // tickers
+    for (size_t i = 0; i < tickers.size(); i++) {
+        tickers[i]->loop();
     }
-}
-
-void myiot::Device::loop()
-{
-    if (MYIOT_SAVE_CONFIG) saveConfig();
-
-    reconnectWiFi();
-    // reconnectMQTT();
-    // readSensors();
 
     // inputs
-    for (size_t i = 0; i < inputs.size(); i++)
-    {
+    for (size_t i = 0; i < inputs.size(); i++) {
         inputs[i]->loop();
     }
 }
+
+}
+
+
