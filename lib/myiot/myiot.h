@@ -27,24 +27,22 @@ class Device
 {
   private:
     String model;
-    WiFiManager wifi_manager;
 
-    // std::vector<Sensor> sensors;
-    std::vector<Input*> inputs;
+    WiFiManager wifi_manager;
     PubSubClient mqtt;
 
+    std::vector<Input*> inputs;
     std::vector<Ticker*> tickers;
 
     void initConfig();
     void saveConfig();
     void initWiFi();
     void initMQTT();
-
     void reconnectWiFi();
     void reconnectMQTT();
   public:
-    std::map<String, myiot_config*> config;
 
+    std::map<String, myiot_config*> config;
 
     Device(String model);
 

@@ -17,7 +17,7 @@ protected:
   bool is_sensor;
   bool is_button;
 
-  std::vector<std::function<void(Input&)>> on_change;
+  std::vector<std::function<void(Input*)>> on_change;
 
   // template accepts int or float
   template<typename T> void _loop(T* value, std::function<T()> reader);
@@ -27,6 +27,7 @@ public:
   float float_value;
   bool is_analog;
   bool publish_on_change;
+  unsigned long read_interval;
   uint16_t debounce_ms;
 
   std::function<int()> read_int;
@@ -52,7 +53,7 @@ public:
     is_enabled = v;
   }
 
-  unsigned int onChange(std::function<void(Input&)> cb)
+  unsigned int onChange(std::function<void(Input*)> cb)
   {
     on_change.push_back(cb);
     return on_change.size();

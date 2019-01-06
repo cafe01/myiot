@@ -102,6 +102,8 @@ void Device::setup()
     addTicker(1000, [this]() -> void { this->reconnectWiFi(); });
     addTicker(1000, [this]() -> void { this->reconnectMQTT(); });
     addTicker(100, [this]() -> void { this->saveConfig(); });
+
+    reconnectWiFi();
 }
 
 
@@ -246,11 +248,12 @@ void Device::reconnectMQTT()
     mqtt.setServer(host, 1883);
     Serial.printf("[MQTT] Connecting to '%s' ... ", host);
 
-    if (mqtt.connect(host))
+    auto client_id = getConfig("name");
+    if (mqtt.connect(client_id))
     {
 
         Serial.printf("connected\n");
-        Serial.printf("[MQTT] client id: %s\n", host);
+        Serial.printf("[MQTT] client id: %s\n", client_id);
         // MQTT.subscribe(cmd_topic.c_str());
     }
     else
@@ -284,6 +287,9 @@ void Device::loop()
     for (size_t i = 0; i < inputs.size(); i++) {
         inputs[i]->loop();
     }
+
+    //
+    mqtt.loop();
 }
 
 }
