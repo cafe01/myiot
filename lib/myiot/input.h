@@ -7,8 +7,8 @@ namespace myiot
 class Input
 {
 protected:
+  String name;
   uint8_t pin;
-  const char* name;
 
   unsigned long last_read;
   unsigned long last_publish;
@@ -34,7 +34,7 @@ public:
   std::function<float()> read_float;
   std::function<String()> to_string;
 
-  Input(const char* name, uint8_t pin);
+  Input(const String &name, uint8_t pin);
   // ~Input();
 
   // const char* name()
@@ -45,7 +45,7 @@ public:
   virtual void setup();
   virtual void loop();
 
-  const char* getName() {
+  String getName() {
     return name;
   };
 

@@ -4,10 +4,10 @@ namespace myiot
 {
 
 
-Input::Input(const char* n, uint8_t p) : pin(p)
+Input::Input(const String &n, uint8_t p) : name(n), pin(p)
 {
     // copy hardcoded char into string
-    this->name = (new String(n))->c_str();
+    // this->name = (new String(n))->c_str();
 
     // init
     is_enabled = true;
@@ -80,7 +80,7 @@ template<typename T> void Input::_loop(T* value, std::function<T()> reader)
     last_read = now;
     *value = read_value;
 
-    Serial.printf("[Input] %s = %s\n", name, String(read_value).c_str());
+    Serial.printf("[Input] %s = %s\n", name.c_str(), String(read_value).c_str());
 
     // trigger on_change
     for (size_t i = 0; i < on_change.size(); ++i)

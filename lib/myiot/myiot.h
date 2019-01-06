@@ -25,7 +25,7 @@ namespace myiot
 
 class Device
 {
-  private:
+  protected:
     String model;
 
     WiFiManager wifi_manager;
@@ -33,6 +33,8 @@ class Device
 
     std::vector<Input*> inputs;
     std::vector<Ticker*> tickers;
+    std::map<String, std::function<void(byte*)>> commands;
+    std::map<String, myiot_config*> config;
 
     void initConfig();
     void saveConfig();
@@ -40,9 +42,8 @@ class Device
     void initMQTT();
     void reconnectWiFi();
     void reconnectMQTT();
-  public:
 
-    std::map<String, myiot_config*> config;
+  public:
 
     Device(String model);
 
@@ -52,10 +53,15 @@ class Device
     void addConfig(String name, size_t size, String default_value);
     char* getConfig(String name);
 
-    Input* addInput(const char* name, uint8_t pin);
     Ticker* addTicker(unsigned long interval, std::function<void()> callback);
 
+    Input* addInput(const String &name, uint8_t pin);
+    Input* input(const String &name);
     void publishInput(Input*, bool retained = false);
+
+    bool hasCommand(const String &name);
+    void addCommand(const String &name, std::function<void(byte*)> callback);
+    void runCommand(const String &name, byte* payload = NULL);
 
 
 }; // Device

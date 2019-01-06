@@ -5,10 +5,8 @@
 
 using namespace myiot;
 
-myiot::Device device("myiot");
+Device device("myiot");
 
-// myiot::Input digital_input("test_digital_input", D2);
-// myiot::Input analog_input("test_analog_input", A0);
 
 void setup()
 {
@@ -16,18 +14,27 @@ void setup()
     // device.addConfig("custom_cfg", 40, "waravalue");
 
     // inputs
-    auto digital = device.addInput("icos01", D2);
+    auto digital = device.addInput("btn", 0);
+
     digital->debounce_ms = 3;
 
-    auto dev = &device;
-
-    digital->onChange([dev](Input *input) -> void {
-        Serial.printf("[cb] input %s changed to %d\n", input->getName(), input->value);
+    digital->onChange([](Input *input) {
+        Serial.printf("[cb] input %s changed to %d\n", input->getName().c_str(), input->value);
         // dev->publishInput(&input, true);
     });
 
     // setup
     device.setup();
+
+    // cmd
+    device.addCommand("report", [](byte* payload){
+        Serial.println("WOOOOOOHOOOOOOOO");
+    });
+
+    device.addTicker(1000, []() {
+        device.runCommand("report");
+    });
+
 }
 
 void loop()

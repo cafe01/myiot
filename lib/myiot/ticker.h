@@ -15,7 +15,7 @@ private:
 public:
     std::function<void()> callback;
 
-    Ticker(unsigned long interval, bool is_enabled);
+    Ticker(unsigned long interval, bool is_enabled = true);
     void loop();
 
     unsigned long getCount() {

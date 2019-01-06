@@ -1,4 +1,3 @@
-
 #include "myiot.h"
 #include "Arduino.h"
 #include <ESP8266WiFi.h>
@@ -36,10 +35,28 @@ Device::Device(String model)
 
 
 // addInput()
-Input* Device::addInput(const char* name, uint8_t pin)
+Input* Device::addInput(const String &name, uint8_t pin)
 {
     auto input = new Input(name, pin);
     inputs.push_back(input);
+    return input;
+}
+
+// input()
+Input* Device::input(const String &name)
+{
+    Input* input = NULL;
+
+    for (size_t i = 0; i < inputs.size(); i++)
+        if (inputs[i]->getName() == name)
+        {
+            input = inputs[i];
+            break;
+        }
+
+    if (input == NULL)
+        Serial.printf("[ERROR] unknown input '%s'\n", name.c_str());
+
     return input;
 }
 
@@ -69,11 +86,48 @@ char* Device::getConfig(String name)
 
 Ticker* Device::addTicker(unsigned long interval, std::function<void()> callback)
 {
-    auto ticker = new Ticker(interval, true);
+    auto ticker = new Ticker(interval);
     ticker->callback = callback;
     tickers.push_back(ticker);
     return ticker;
 }
+
+bool Device::hasCommand(const String &name)
+{
+    auto it = commands.find(name);
+    return it != commands.end();
+}
+
+void Device::addCommand(const String &name, std::function<void(byte*)> callback)
+{
+    // soft-exception
+    if (hasCommand(name))
+    {
+        Serial.printf("[WARNING] addCommand(): cmd '%s' already exists. You should take some rest..\n", name.c_str());
+        return;
+    }
+
+    commands[name] = callback;
+}
+
+void Device::runCommand(const String &name, byte* payload)
+{
+    // soft-exception
+    if (!hasCommand(name))
+    {
+        Serial.printf("[WARNING] runCommand(): unknown cmd '%s'. You should take some rest..\n", name.c_str());
+        return;
+    }
+    Serial.printf("[runCommand] %s\n", name.c_str());
+    // commands[name](payload);
+    commands.find(name)->second(payload);
+}
+
+
+
+
+
+
 
 // setup()
 void Device::setup()
@@ -269,7 +323,7 @@ void Device::publishInput(Input* input, bool retained)
         Serial.println("[MQTT] publishInput skipped (mqtt is disconnected)");
         return;
     }
-    String topic = "stat/" + String(getConfig("name")) + "/" + String(input->getName());
+    String topic = "stat/" + String(getConfig("name")) + "/" + input->getName();
     String payload = input->to_string();
     Serial.printf("[MQTT] publishing to '%s': '%s'\n", topic.c_str(), payload.c_str());
     mqtt.publish(topic.c_str(), payload.c_str(), retained);
