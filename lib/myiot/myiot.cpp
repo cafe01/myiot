@@ -6,7 +6,6 @@
 #include "FS.h"
 #include "WiFiManager.h"
 #include "ArduinoJson.h"
-#include "ticker.h"
 
 namespace myiot
 {
@@ -33,6 +32,22 @@ Device::Device(String model)
 
 }
 
+
+Output* Device::addOutput(const char* name, uint8_t pin)
+{
+    auto output = new Output(name, pin);
+    outputs.push_back(output);
+    return output;
+}
+
+Output* Device::output(const char* name)
+{
+    for (size_t i = 0; i < outputs.size(); i++)
+        if (strcmp(outputs[i]->name, name) == 0)
+            return outputs[i];
+
+    return NULL;
+}
 
 // addInput()
 Input* Device::addInput(const String &name, uint8_t pin)
@@ -187,6 +202,10 @@ void Device::setup()
     // inputs
     for (size_t i = 0; i < inputs.size(); i++)
         inputs[i]->setup();
+
+    // outputs
+    for (size_t i = 0; i < outputs.size(); i++)
+        outputs[i]->setup();
 
     // loop tasks
     addTicker(1000, [this]() -> void { this->reconnectWiFi(); });

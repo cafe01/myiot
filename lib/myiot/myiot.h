@@ -7,6 +7,7 @@
 #include "ticker.h"
 #include "button.h"
 #include "input.h"
+#include "output.h"
 #include "sensor.h"
 
 
@@ -37,6 +38,7 @@ class Device
     WiFiManager wifi_manager;
     PubSubClient mqtt;
 
+    std::vector<Output*> outputs;
     std::vector<Input*> inputs;
     std::vector<Ticker*> tickers;
     std::map<String, mqtt_subscription_callback> commands;
@@ -66,6 +68,9 @@ class Device
     Input* addInput(const String &name, uint8_t pin);
     Input* input(const String &name);
     void publishInput(Input*, bool retained = false);
+
+    Output* addOutput(const char* name, uint8_t pin);
+    Output* output(const char* name);
 
     void publish(const char* topic, const String &payload);
     void subscribe(const char* topic, mqtt_subscription_callback callback);

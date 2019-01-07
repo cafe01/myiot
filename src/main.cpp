@@ -5,6 +5,8 @@
 
 using namespace myiot;
 
+#define LEDPIN 16
+
 Device device("myiot");
 
 
@@ -23,12 +25,18 @@ void setup()
         // dev->publishInput(&input, true);
     });
 
+    // outputs
+    auto led = device.addOutput("led", LEDPIN);
+    led->write(1); // start off
+
     // setup
     device.setup();
 
     // cmd
-    device.addCommand("report", [](const char* payload){
-        Serial.printf("On 'report' command callback! (%s)\n", payload == NULL ? "null" : payload);
+    device.addCommand("led_toggle", [](const char* payload)
+    {
+        auto led = device.output("led");
+        led->write(!led->pinValue());
     });
 
     // device.addTicker(1000, []() {
