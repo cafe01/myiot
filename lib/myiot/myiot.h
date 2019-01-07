@@ -10,6 +10,9 @@
 #include "sensor.h"
 
 
+namespace myiot
+{
+
 struct myiot_config
 {
     String default_value;
@@ -18,10 +21,13 @@ struct myiot_config
     WiFiManagerParameter* wifi_parameter;
 };
 
-
-namespace myiot
+typedef std::function<void(const char* payload)> mqtt_subscription_callback;
+struct mqtt_subscription
 {
-
+    const char* topic;
+    bool is_subscribed;
+    mqtt_subscription_callback callback;
+};
 
 class Device
 {
@@ -33,7 +39,8 @@ class Device
 
     std::vector<Input*> inputs;
     std::vector<Ticker*> tickers;
-    std::map<String, std::function<void(byte*)>> commands;
+    std::map<String, mqtt_subscription_callback> commands;
+    std::vector<mqtt_subscription*> subscriptions;
     std::map<String, myiot_config*> config;
 
     void initConfig();
@@ -43,6 +50,7 @@ class Device
     void reconnectWiFi();
     void reconnectMQTT();
 
+    void mqttCallback(char* topic, byte* payload, unsigned int size);
   public:
 
     Device(String model);
@@ -51,7 +59,7 @@ class Device
     void loop();
 
     void addConfig(String name, size_t size, String default_value);
-    char* getConfig(String name);
+    char* getConfig(const String &name);
 
     Ticker* addTicker(unsigned long interval, std::function<void()> callback);
 
@@ -59,9 +67,13 @@ class Device
     Input* input(const String &name);
     void publishInput(Input*, bool retained = false);
 
+    void publish(const char* topic, const String &payload);
+    void subscribe(const char* topic, mqtt_subscription_callback callback);
+    bool hasSubscription(const char* topic);
+
+    void addCommand(const String &name, mqtt_subscription_callback callback);
+    void runCommand(const String &name, const char* payload = NULL);
     bool hasCommand(const String &name);
-    void addCommand(const String &name, std::function<void(byte*)> callback);
-    void runCommand(const String &name, byte* payload = NULL);
 
 
 }; // Device

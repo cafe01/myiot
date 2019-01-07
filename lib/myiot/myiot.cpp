@@ -75,7 +75,7 @@ void Device::addConfig(String name, size_t size, String default_value)
 }
 
 // getConfig()
-char* Device::getConfig(String name)
+char* Device::getConfig(const String &name)
 {
     auto it = config.find(name);
     if (it == config.end())
@@ -94,11 +94,10 @@ Ticker* Device::addTicker(unsigned long interval, std::function<void()> callback
 
 bool Device::hasCommand(const String &name)
 {
-    auto it = commands.find(name);
-    return it != commands.end();
+    return commands.find(name) != commands.end();
 }
 
-void Device::addCommand(const String &name, std::function<void(byte*)> callback)
+void Device::addCommand(const String &name, mqtt_subscription_callback callback)
 {
     // soft-exception
     if (hasCommand(name))
@@ -107,10 +106,18 @@ void Device::addCommand(const String &name, std::function<void(byte*)> callback)
         return;
     }
 
+    // save callback
     commands[name] = callback;
+
+    // subscribe to command topic
+    String topic = "cmnd/" + String(getConfig("name")) + "/" + name;
+    subscribe(topic.c_str(), [callback](const char* payload) {
+        // Serial.printf("ON subscribe handler!!! (%s)\n", payload);
+        callback(payload);
+    });
 }
 
-void Device::runCommand(const String &name, byte* payload)
+void Device::runCommand(const String &name, const char* payload)
 {
     // soft-exception
     if (!hasCommand(name))
@@ -119,11 +126,37 @@ void Device::runCommand(const String &name, byte* payload)
         return;
     }
     Serial.printf("[runCommand] %s\n", name.c_str());
-    // commands[name](payload);
-    commands.find(name)->second(payload);
+    commands[name](payload);
 }
 
 
+void Device::subscribe(const char* topic, mqtt_subscription_callback callback)
+{
+    if (hasSubscription(topic))
+    {
+        Serial.printf("[!!] already subscribed to topic '%s'", topic);
+        return;
+    }
+
+    auto new_subscription = new mqtt_subscription {
+        (new String(topic))->c_str(),
+        false,
+        callback
+    };
+
+    subscriptions.push_back(new_subscription);
+}
+
+
+bool Device::hasSubscription(const char* topic)
+{
+    for (size_t i = 0; i < subscriptions.size(); i++)
+    {
+        if (strcmp(subscriptions[i]->topic, topic) == 0)
+            return true;
+    }
+    return false;
+}
 
 
 
@@ -146,11 +179,14 @@ void Device::setup()
     // wifi
     initWiFi();
 
+    // mqtt
+    mqtt.setCallback([this](char* topic, byte* payload, unsigned int size) -> void {
+        mqttCallback(topic, payload, size);
+    });
+
     // inputs
     for (size_t i = 0; i < inputs.size(); i++)
-    {
         inputs[i]->setup();
-    }
 
     // loop tasks
     addTicker(1000, [this]() -> void { this->reconnectWiFi(); });
@@ -260,7 +296,7 @@ void Device::initWiFi()
 
 
     // portal timeout
-    wifi_manager.setTimeout(180);
+    wifi_manager.setTimeout(120);
 
     // add config parameters
     for (auto it = config.begin(); it != config.end(); ++it)
@@ -281,7 +317,10 @@ void Device::reconnectWiFi()
 
     if(!wifi_manager.autoConnect(getConfig("name"))) {
         Serial.println("[WiFi] managet autoConnect() timedout.");
+        Serial.println("Restarting device...");
         delay(3000);
+        ESP.reset();
+        delay(6000);
     }
     else
     {
@@ -296,24 +335,61 @@ void Device::reconnectWiFi()
 
 void Device::reconnectMQTT()
 {
-    if (mqtt.connected()) return;
+    // already connected, send pending subscriptions
+    if (mqtt.connected())
+    {
+        for (size_t i = 0; i < subscriptions.size(); i++)
+        {
+            auto item = subscriptions[i];
 
+            // skip already subscribed
+            if (item->is_subscribed) continue;
+
+            // subscribe
+            if (mqtt.subscribe(item->topic))
+            {
+                Serial.printf("[MQTT] subscribed to '%s'\n", item->topic);
+                item->is_subscribed = true;
+            }
+            else
+                Serial.printf("[!!] [MQTT] couldn't subscribe to '%s'\n", item->topic);
+        }
+
+        return;
+    }
+
+    // (re)connect!
     auto host = getConfig("mqtt_host");
     mqtt.setServer(host, 1883);
     Serial.printf("[MQTT] Connecting to '%s' ... ", host);
 
     auto client_id = getConfig("name");
     if (mqtt.connect(client_id))
-    {
-
-        Serial.printf("connected\n");
-        Serial.printf("[MQTT] client id: %s\n", client_id);
-        // MQTT.subscribe(cmd_topic.c_str());
-    }
+        Serial.printf("connected. (client_id: %s)\n", client_id);
     else
-    {
         Serial.printf("error: %d\n", mqtt.state());
+}
+
+void Device::mqttCallback(char* topic, byte* payload, unsigned int size)
+{
+    // copy payload
+    // TODO use stack variable
+    // char[MQTT_MAX_PACKET_SIZE] content_buf;
+    char *content = new char[size+1];
+    strncpy(content, (const char*)payload, size);
+    content[size] = '\0';
+
+    Serial.printf("[mqttCallback] '%s': (%d bytes) '%s'\n", topic, size, content);
+
+    // run callbacks
+    for (size_t i = 0; i < subscriptions.size(); i++)
+    {
+        if (strcmp(topic, subscriptions[i]->topic) == 0)
+            subscriptions[i]->callback(content);
     }
+
+    // delete content
+    free(content);
 }
 
 void Device::publishInput(Input* input, bool retained)
@@ -328,6 +404,7 @@ void Device::publishInput(Input* input, bool retained)
     Serial.printf("[MQTT] publishing to '%s': '%s'\n", topic.c_str(), payload.c_str());
     mqtt.publish(topic.c_str(), payload.c_str(), retained);
 }
+
 
 // loop
 void Device::loop()

@@ -27,13 +27,13 @@ void setup()
     device.setup();
 
     // cmd
-    device.addCommand("report", [](byte* payload){
-        Serial.println("WOOOOOOHOOOOOOOO");
+    device.addCommand("report", [](const char* payload){
+        Serial.printf("On 'report' command callback! (%s)\n", payload == NULL ? "null" : payload);
     });
 
-    device.addTicker(1000, []() {
-        device.runCommand("report");
-    });
+    // device.addTicker(1000, []() {
+    //     device.runCommand("report");
+    // });
 
 }
 
