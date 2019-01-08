@@ -27,6 +27,7 @@ public:
   float float_value;
   bool is_analog;
   bool publish_on_change;
+  unsigned long last_change;
   unsigned long read_interval;
   uint16_t debounce_ms;
 

@@ -37,6 +37,11 @@ class Output
     {
         return is_analog ? analogRead(pin) : digitalRead(pin);
     }
+
+    void toggle()
+    {
+        write(!pinValue());
+    }
 };
 
 } // namespace myiot

@@ -50,6 +50,11 @@ Output* Device::output(const char* name)
 }
 
 // addInput()
+void Device::addInput(Input* input)
+{
+    inputs.push_back(input);
+}
+
 Input* Device::addInput(const String &name, uint8_t pin)
 {
     auto input = new Input(name, pin);

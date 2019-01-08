@@ -15,20 +15,19 @@ class Button : public Input
     // uint8_t input_mode;
     // bool is_pullup;
     // // bool is_internal_pullup;
-    // std::map<uint8_t, std::function<void()>> click_callbacks;
     // bool is_down;
     // unsigned long last_down;
     // unsigned long last_up;
 
-    // uint8_t pending_clicks;
+    uint8_t pending_clicks;
+    std::map<uint8_t, std::function<void()>> click_callbacks;
+    void on_state_change();
   public:
-    Button(const char* name, uint8_t pin) : Input(name, pin)
-    {
-        is_button = true;
-    }
-    // void setup();
-    // void onClicks(uint8_t number_of_clicks, std::function<void()> callback);
-    // void loop();
+    Button(const char* name, uint8_t pin);
+    void setup();
+    void onClicks(uint8_t number_of_clicks, std::function<void()> callback);
+    void triggerClicks(uint8_t number_of_clicks, bool reset_pending_clicks = true);
+    void loop();
 };
 
 

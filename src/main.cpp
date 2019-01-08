@@ -9,21 +9,25 @@ using namespace myiot;
 
 Device device("myiot");
 
+Button btn("btn", 0);
 
 void setup()
 {
     // custom config
     // device.addConfig("custom_cfg", 40, "waravalue");
 
+    // btn
+    device.addInput(&btn);
+
     // inputs
-    auto digital = device.addInput("btn", 0);
+    // auto digital = device.addInput("btn", 0);
 
-    digital->debounce_ms = 3;
+    // digital->debounce_ms = 3;
 
-    digital->onChange([](Input *input) {
-        Serial.printf("[cb] input %s changed to %d\n", input->getName().c_str(), input->value);
-        // dev->publishInput(&input, true);
-    });
+    // digital->onChange([](Input *input) {
+    //     Serial.printf("[cb] input %s changed to %d\n", input->getName().c_str(), input->value);
+    //     // dev->publishInput(&input, true);
+    // });
 
     // outputs
     auto led = device.addOutput("led", LEDPIN);
@@ -36,7 +40,7 @@ void setup()
     device.addCommand("led_toggle", [](const char* payload)
     {
         auto led = device.output("led");
-        led->write(!led->pinValue());
+        led->toggle();
     });
 
     // device.addTicker(1000, []() {
@@ -44,6 +48,8 @@ void setup()
     // });
 
 }
+
+// int last_loop = 0;
 
 void loop()
 {

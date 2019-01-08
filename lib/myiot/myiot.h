@@ -8,7 +8,6 @@
 #include "button.h"
 #include "input.h"
 #include "output.h"
-#include "sensor.h"
 
 
 namespace myiot
@@ -65,6 +64,7 @@ class Device
 
     Ticker* addTicker(unsigned long interval, std::function<void()> callback);
 
+    void addInput(Input*);
     Input* addInput(const String &name, uint8_t pin);
     Input* input(const String &name);
     void publishInput(Input*, bool retained = false);

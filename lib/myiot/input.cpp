@@ -77,7 +77,6 @@ template<typename T> void Input::_loop(T* value, std::function<T()> reader)
     }
 
     // change state
-    last_read = now;
     *value = read_value;
 
     Serial.printf("[Input] %s = %s\n", name.c_str(), String(read_value).c_str());
@@ -85,9 +84,12 @@ template<typename T> void Input::_loop(T* value, std::function<T()> reader)
     // trigger on_change
     for (size_t i = 0; i < on_change.size(); ++i)
     {
-        // Serial.printf("[Input:%s] calling callback %d for", name, i);
+        // Serial.printf("[Input:%s] calling callback %d \n", name.c_str(), (int)i);
         on_change[i](this);
     }
+
+    // change times
+    last_change = last_read = now;
 }
 
 
