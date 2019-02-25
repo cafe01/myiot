@@ -10,12 +10,12 @@ protected:
   String name;
   uint8_t pin;
 
-  unsigned long last_read;
-  unsigned long last_publish;
+  unsigned long last_read = 0;
+  unsigned long last_publish = 0;
 
-  bool is_enabled;
-  bool is_sensor;
-  bool is_button;
+  bool is_enabled = true;
+  bool is_sensor = false;
+  bool is_button = false;
 
   std::vector<std::function<void(Input*)>> on_change;
 
@@ -23,18 +23,19 @@ protected:
   template<typename T> void _loop(T* value, std::function<T()> reader);
 
 public:
-  int value;
-  float float_value;
-  bool is_analog;
+  int value = 0;
+  float float_value = 0;
+  bool is_analog = false;
   bool publish_on_change;
   unsigned long last_change;
-  unsigned long read_interval;
-  uint16_t debounce_ms;
+  unsigned long read_interval = 0;
+  uint16_t debounce_ms = 10;
 
   std::function<int()> read_int;
   std::function<float()> read_float;
   std::function<String()> to_string;
 
+  Input(const String &name);
   Input(const String &name, uint8_t pin);
   // ~Input();
 

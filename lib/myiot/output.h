@@ -8,26 +8,14 @@ class Output
 {
   protected:
     uint8_t pin;
-
+    int value;
   public:
     char *name;
-    bool is_analog;
-    Output(const char *n, uint8_t p)
-    {
-        // name
-        size_t size = strlen(n) + 1;
-        this->name = new char[size];
-        strncpy(name, n, size);
+    bool is_analog = false;
+    Output(const char *n);
+    Output(const char *n, uint8_t p);
 
-        //
-        pin = p;
-        is_analog = false;
-    }
-
-    virtual void setup()
-    {
-        pinMode(pin, OUTPUT);
-    }
+    virtual void setup();
 
     virtual void loop() {}
 
@@ -40,8 +28,11 @@ class Output
 
     void toggle()
     {
-        write(!pinValue());
+        if (!is_analog)
+          write(!pinValue());
     }
+
+    // TODO onChange()
 };
 
 } // namespace myiot

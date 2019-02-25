@@ -4,18 +4,12 @@ namespace myiot
 {
 
 
+Input::Input(const String &n) : name(n)
+{
+}
+
 Input::Input(const String &n, uint8_t p) : name(n), pin(p)
 {
-    // copy hardcoded char into string
-    // this->name = (new String(n))->c_str();
-
-    // init
-    is_enabled = true;
-    is_sensor = is_button = false;
-    read_interval = 0;
-    debounce_ms = 10;
-    value = last_read = last_publish = 0;
-
 }
 
 void Input::setup()

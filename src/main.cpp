@@ -9,7 +9,10 @@ using namespace myiot;
 
 Device device("myiot");
 
-Button btn("btn", 0);
+// Button btn("btn", 0);
+
+// LED led("led", D2);
+LED led("led", D1, D2, D5);
 
 void setup()
 {
@@ -17,7 +20,7 @@ void setup()
     // device.addConfig("custom_cfg", 40, "waravalue");
 
     // btn
-    device.addInput(&btn);
+    // device.addInput(&btn);
 
     // inputs
     // auto digital = device.addInput("btn", 0);
@@ -29,11 +32,11 @@ void setup()
     //     // dev->publishInput(&input, true);
     // });
 
-    // outputs
-    auto led = device.addOutput("led", LEDPIN);
-    led->write(1); // start off
+    // led
+    device.addOutput(&led);
 
     // setup
+    led.setup();
     device.setup();
 
     // cmd
@@ -43,9 +46,17 @@ void setup()
         led->toggle();
     });
 
-    // device.addTicker(1000, []() {
-    //     device.runCommand("report");
-    // });
+    device.addTicker(500, []() {
+        static int i = 0;
+        int turn = ++i % 6;
+
+        if (turn == 0) led.setColor({0, 0, 0});
+        else if (turn == 1) led.setColor({255, 0, 0});
+        else if (turn == 2) led.setColor({0, 255, 0});
+        else if (turn == 3) led.setColor({0, 0, 255});
+        else if (turn == 4) led.setColor({ 255, 85, 0});
+        else if (turn == 5) led.setColor({255, 255, 255});
+    });
 
 }
 

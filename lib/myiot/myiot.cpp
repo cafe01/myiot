@@ -32,6 +32,10 @@ Device::Device(String model)
 
 }
 
+void Device::addOutput(Output* output)
+{
+    outputs.push_back(output);
+}
 
 Output* Device::addOutput(const char* name, uint8_t pin)
 {
@@ -217,9 +221,10 @@ void Device::setup()
     addTicker(1000, [this]() -> void { this->reconnectMQTT(); });
     addTicker(100, [this]() -> void { this->saveConfig(); });
 
+    // TODO add telemetry
+
     reconnectWiFi();
 }
-
 
 void Device::initConfig()
 {
@@ -229,6 +234,15 @@ void Device::initConfig()
     {
         Serial.println("[ERROR] error mounting file system.");
         return;
+    }
+
+    // reset config
+    if (resetConfig && SPIFFS.exists("/config.json"))
+    {
+        if (SPIFFS.remove("/config.json"))
+            Serial.println("!!! CONFIG FILE DELETED! (remember to disable) ");
+        else
+            Serial.println("[ERROR] could not delete config.json");
     }
 
     // load existing config
@@ -339,6 +353,9 @@ void Device::reconnectWiFi()
     if (WiFi.status() == WL_CONNECTED)
         return;
 
+    if (status_led)
+        digitalWrite(status_led, HIGH);
+
     if(!wifi_manager.autoConnect(getConfig("name"))) {
         Serial.println("[WiFi] managet autoConnect() timedout.");
         Serial.println("Restarting device...");
@@ -355,6 +372,9 @@ void Device::reconnectWiFi()
             strcpy(cfg->value, cfg->wifi_parameter->getValue());
         }
     }
+
+    if (status_led)
+        digitalWrite(status_led, LOW);
 }
 
 void Device::reconnectMQTT()
@@ -414,6 +434,11 @@ void Device::mqttCallback(char* topic, byte* payload, unsigned int size)
 
     // delete content
     free(content);
+}
+
+void Device::publish(const char* topic, const char* payload)
+{
+    mqtt.publish(topic, payload);
 }
 
 void Device::publishInput(Input* input, bool retained)

@@ -8,6 +8,7 @@
 #include "button.h"
 #include "input.h"
 #include "output.h"
+#include "led.h"
 
 
 namespace myiot
@@ -33,7 +34,7 @@ class Device
 {
   protected:
     String model;
-
+    uint8_t status_led;
     WiFiManager wifi_manager;
     PubSubClient mqtt;
 
@@ -54,10 +55,18 @@ class Device
     void mqttCallback(char* topic, byte* payload, unsigned int size);
   public:
 
+    bool resetConfig;
+
     Device(String model);
 
     void setup();
     void loop();
+
+    void setStatusLED(uint8_t pin)
+    {
+        pinMode(pin, OUTPUT);
+        status_led = pin;
+    };
 
     void addConfig(String name, size_t size, String default_value);
     char* getConfig(const String &name);
@@ -69,10 +78,11 @@ class Device
     Input* input(const String &name);
     void publishInput(Input*, bool retained = false);
 
+    void addOutput(Output*);
     Output* addOutput(const char* name, uint8_t pin);
     Output* output(const char* name);
 
-    void publish(const char* topic, const String &payload);
+    void publish(const char* topic, const char* payload);
     void subscribe(const char* topic, mqtt_subscription_callback callback);
     bool hasSubscription(const char* topic);
 
