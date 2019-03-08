@@ -16,8 +16,9 @@ namespace myiot
 
 struct myiot_config
 {
-    String default_value;
+    const char* name;
     size_t size;
+    const char* default_value;
     char* value;
     WiFiManagerParameter* wifi_parameter;
 };
@@ -43,7 +44,7 @@ class Device
     std::vector<Ticker*> tickers;
     std::map<String, mqtt_subscription_callback> commands;
     std::vector<mqtt_subscription*> subscriptions;
-    std::map<String, myiot_config*> config;
+    std::vector<myiot_config*> config;
 
     void initConfig();
     void saveConfig();
@@ -68,8 +69,9 @@ class Device
         status_led = pin;
     };
 
-    void addConfig(String name, size_t size, String default_value);
-    char* getConfig(const String &name);
+    void addConfig(const char* name, size_t size, const char* default_value);
+    char* getConfig(const char* name);
+    void setConfig(const char*, const char* value);
 
     Ticker* addTicker(unsigned long interval, std::function<void()> callback);
 

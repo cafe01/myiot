@@ -85,27 +85,39 @@ Input* Device::input(const String &name)
 }
 
 // addConfig()
-void Device::addConfig(String name, size_t size, String default_value)
+void Device::addConfig(const char* name, size_t size, const char* default_value)
 {
     myiot_config* cfg = new myiot_config();
 
+    cfg->name = name;
     cfg->size = size;
     cfg->default_value = default_value;
+
     cfg->value = new char[size];
-    strcpy(cfg->value, default_value.c_str());
+    strcpy(cfg->value, default_value);
     cfg->wifi_parameter = NULL;
 
-    config[name] = cfg;
+    config.push_back(cfg);
 }
 
 // getConfig()
-char* Device::getConfig(const String &name)
+char* Device::getConfig(const char* name)
 {
-    auto it = config.find(name);
-    if (it == config.end())
-        Serial.printf("[ERROR] invalid config '%s'\n", name.c_str());
+    for (size_t i = 0; i < config.size(); i++)
+        if (strcmp(config[i]->name, name) == 0)
+            return config[i]->value;
 
-    return it->second->value;
+    Serial.printf("[ERROR] getConfig: unknown config '%s'\n", name);
+    return 0;
+}
+
+void Device::setConfig(const char* name, const char* value)
+{
+    for (size_t i = 0; i < config.size(); i++)
+        if (strcmp(config[i]->name, name) == 0)
+            strncpy(config[i]->value, value, config[i]->size);
+
+    MYIOT_SAVE_CONFIG = true;
 }
 
 Ticker* Device::addTicker(unsigned long interval, std::function<void()> callback)
@@ -190,8 +202,9 @@ bool Device::hasSubscription(const char* topic)
 void Device::setup()
 {
     // setup serial
-    delay(1000);
+    delay(500);
     Serial.begin(9600);
+    delay(500);
     Serial.println("\nMyIOT started!");
 
     // dev only
@@ -223,7 +236,7 @@ void Device::setup()
 
     // TODO add telemetry
 
-    reconnectWiFi();
+    // reconnectWiFi();
 }
 
 void Device::initConfig()
@@ -260,11 +273,12 @@ void Device::initConfig()
             json.printTo(Serial);
             if (json.success()) {
                 Serial.println("\nparsed json");
-                for (auto it = config.begin(); it != config.end(); ++it)
+
+                for (size_t i = 0; i < config.size(); i++)
                 {
-                    auto cfg = it->second;
-                    if (json.containsKey(it->first))
-                        strcpy(cfg->value, json[it->first]);
+                    auto cfg = config[i];
+                    if (json.containsKey(cfg->name))
+                        strcpy(cfg->value, json[cfg->name]);
                 };
 
             } else {
@@ -276,17 +290,14 @@ void Device::initConfig()
 
     // create wifi parameters
     // NOTE new config values wont be reflected on webadmin
-    for (auto it = config.begin(); it != config.end(); ++it)
-    {
-        auto cfg = it->second;
-        cfg->wifi_parameter = new WiFiManagerParameter(it->first.c_str(), cfg->default_value.c_str(), cfg->value, cfg->size);
-    };
+    for (size_t i = 0; i < config.size(); i++)
+        config[i]->wifi_parameter = new WiFiManagerParameter(config[i]->name, config[i]->default_value, config[i]->value, config[i]->size);
 
 
     Serial.println("==== Current config ====");
-    for (auto it = config.begin(); it != config.end(); ++it)
+    for (size_t i = 0; i < config.size(); i++)
     {
-        Serial.printf("> %s: %s\n", it->first.c_str(), it->second->value);
+        Serial.printf("> %s: %s\n", config[i]->name, config[i]->value);
     };
 }
 
@@ -297,11 +308,8 @@ void Device::saveConfig()
     DynamicJsonBuffer jsonBuffer;
     JsonObject& json = jsonBuffer.createObject();
 
-    for (auto it = config.begin(); it != config.end(); it++)
-    {
-        auto cfg = it->second;
-        json[it->first] = cfg->value;
-    }
+    for (size_t i = 0; i < config.size(); i++)
+        json[config[i]->name] = config[i]->value;
 
     File configFile = SPIFFS.open("/config.json", "w");
     if (!configFile) {
@@ -337,11 +345,8 @@ void Device::initWiFi()
     wifi_manager.setTimeout(120);
 
     // add config parameters
-    for (auto it = config.begin(); it != config.end(); ++it)
-    {
-        auto cfg = it->second;
-        wifi_manager.addParameter(cfg->wifi_parameter);
-    };
+    for (size_t i = 0; i < config.size(); i++)
+        wifi_manager.addParameter(config[i]->wifi_parameter);
 
     wifi_manager.setSaveConfigCallback([]() -> void {
         MYIOT_SAVE_CONFIG = true;
@@ -356,7 +361,8 @@ void Device::reconnectWiFi()
     if (status_led)
         digitalWrite(status_led, HIGH);
 
-    if(!wifi_manager.autoConnect(getConfig("name"))) {
+    if(!wifi_manager.autoConnect(getConfig("name")))
+    {
         Serial.println("[WiFi] managet autoConnect() timedout.");
         Serial.println("Restarting device...");
         delay(3000);
@@ -366,11 +372,10 @@ void Device::reconnectWiFi()
     else
     {
         Serial.println("[WiFi] Connected! IP: " + WiFi.localIP().toString());
-        for (auto it = config.begin(); it != config.end(); it++)
-        {
-            auto cfg = it->second;
-            strcpy(cfg->value, cfg->wifi_parameter->getValue());
-        }
+
+        // load config values from wifiparams
+        for (size_t i = 0; i < config.size(); i++)
+            strcpy(config[i]->value, config[i]->wifi_parameter->getValue());
     }
 
     if (status_led)

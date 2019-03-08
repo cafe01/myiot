@@ -21,7 +21,7 @@ namespace myiot
             pinMode(r_pin, OUTPUT);
             pinMode(g_pin, OUTPUT);
             pinMode(b_pin, OUTPUT);
-            Serial.printf("[LED] rgb pins: %d, %d, %d\n", r_pin, g_pin, b_pin);
+            // Serial.printf("[LED] rgb pins: %d, %d, %d\n", r_pin, g_pin, b_pin);
         }
         else
             pinMode(pin, OUTPUT);
@@ -29,7 +29,7 @@ namespace myiot
 
     void LED::setColor(Color new_color, bool apply_color /* = true */) {
         color = new_color;
-        Serial.printf("[LED] setColor(%d, %d, %d)\n", color.red, color.green, color.blue);
+        // Serial.printf("[LED] setColor(%d, %d, %d)\n", color.red, color.green, color.blue);
 
         if (apply_color)
             applyColor();

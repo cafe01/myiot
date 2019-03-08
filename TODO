@@ -1,0 +1,4 @@
+- implement telemetry
+- implement mqtt-based configuration
+- implement mqtt log
+- implement wifi-manager command
