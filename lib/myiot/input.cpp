@@ -37,6 +37,9 @@ void Input::setup()
 
 void Input::loop()
 {
+    // warming up
+    if (millis() < warmup_time) return;
+
     // read interval
     if (millis() - last_read < read_interval) return;
 
