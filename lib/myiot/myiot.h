@@ -24,6 +24,8 @@ struct myiot_config
 };
 
 typedef std::function<void(const char* payload)> mqtt_subscription_callback;
+typedef std::function<void(Input*)> input_callback;
+typedef std::function<void(Output*)> output_callback;
 struct mqtt_subscription
 {
     const char* topic;
@@ -70,30 +72,46 @@ class Device
         status_led = pin;
     };
 
+    Ticker* addTicker(unsigned long interval, std::function<void()> callback);
+
+    // config
     void addConfig(const char* name, size_t size, const char* default_value);
     char* getConfig(const char* name);
     void setConfig(const char*, const char* value);
     void resetConfig();
 
-    Ticker* addTicker(unsigned long interval, std::function<void()> callback);
+    // TODO
+    // void add(Input*);
+    // void add(Output*);
 
+    // input
     void addInput(Input*);
     Input* addInput(const String &name, uint8_t pin);
     Input* input(const String &name);
-    void publishInput(Input*, bool retained = false);
 
+    // output
     void addOutput(Output*);
     Output* addOutput(const char* name, uint8_t pin);
     Output* output(const char* name);
 
-    bool publish(const char* topic, const char* payload);
+    // each
+    void eachInput(input_callback);
+    void eachOutput(output_callback);
+
+    // subscribe
     void subscribe(const char* topic, mqtt_subscription_callback callback);
     bool hasSubscription(const char* topic);
 
+    // publish
+    bool publish(const char* topic, const char* payload);
+    bool publish(Input*, bool retained = false);
+
+    // commands
     void addCommand(const String &name, mqtt_subscription_callback callback);
     void runCommand(const String &name, const char* payload = NULL);
     bool hasCommand(const String &name);
 
+    // telemetry
     void sendTelemetry();
 
 

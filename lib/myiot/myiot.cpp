@@ -84,6 +84,7 @@ Input* Device::input(const String &name)
     return input;
 }
 
+
 // addConfig()
 void Device::addConfig(const char* name, size_t size, const char* default_value)
 {
@@ -480,18 +481,32 @@ bool Device::publish(const char* topic, const char* payload)
     return mqtt.publish(topic, payload);
 }
 
-void Device::publishInput(Input* input, bool retained)
+bool Device::publish(Input* input, bool retained)
 {
     if (!mqtt.connected())
     {
         Serial.println("[MQTT] publishInput skipped (mqtt is disconnected)");
-        return;
+        return false;
     }
     String topic = "stat/" + String(getConfig("name")) + "/" + input->getName();
     String payload = input->to_string();
     Serial.printf("[MQTT] publishing to '%s': '%s'\n", topic.c_str(), payload.c_str());
-    mqtt.publish(topic.c_str(), payload.c_str(), retained);
+    return mqtt.publish(topic.c_str(), payload.c_str(), retained);
 }
+
+// each
+void Device::eachInput(input_callback cb)
+{
+    for (size_t i = 0; i < inputs.size(); i++)
+        cb(inputs[i]);
+}
+void Device::eachOutput(output_callback cb)
+{
+    for (size_t i = 0; i < outputs.size(); i++)
+        cb(outputs[i]);
+}
+
+
 
 void Device::sendTelemetry()
 {
