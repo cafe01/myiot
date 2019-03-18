@@ -23,7 +23,15 @@ void setup()
     });
 
     // btn
-    // device.addInput(&btn);
+    device.addInput(&btn);
+
+    btn.onClicks(4, [](){
+        device.restart();
+    });
+
+    btn.onClicks(0, [](){
+        device.startConfigPortal();
+    });
 
     // inputs
     // auto digital = device.addInput("btn", 0);
@@ -48,6 +56,14 @@ void setup()
     // {
     //     led.toggle();
     // });
+    device.addCommand("restart", [](const char* payload)
+    {
+        device.restart();
+    });
+
+    device.addTicker(1000* 10, []() {
+        device.sendTelemetry();
+    });
 
     // device.addTicker(500, []() {
     //     static int i = 0;

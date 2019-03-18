@@ -204,7 +204,7 @@ void Device::setup()
     // setup serial
     delay(500);
     Serial.begin(9600);
-    delay(500);
+    while(!Serial) {}
     Serial.println("\nMyIOT started!");
 
     // dev only
@@ -232,11 +232,32 @@ void Device::setup()
     // loop tasks
     addTicker(1000, [this]() -> void { this->reconnectWiFi(); });
     addTicker(1000, [this]() -> void { this->reconnectMQTT(); });
-    addTicker(100, [this]() -> void { this->saveConfig(); });
 
     // TODO add telemetry
 
     // reconnectWiFi();
+}
+
+void Device::resetConfig()
+{
+    // mount file system
+    if (!SPIFFS.begin())
+    {
+        Serial.println("[resetConfig] error mounting file system.");
+        return;
+    }
+
+    // delete config file
+    if (SPIFFS.exists("/config.json"))
+    {
+        if (SPIFFS.remove("/config.json"))
+            Serial.println("[resetConfig] config.json deleted.");
+        else
+            Serial.println("[resetConfig] could not delete config.json");
+    }
+
+    // restart
+    restart();
 }
 
 void Device::initConfig()
@@ -245,17 +266,8 @@ void Device::initConfig()
     // mount fs
     if (!SPIFFS.begin())
     {
-        Serial.println("[ERROR] error mounting file system.");
+        Serial.println("[initConfig] error mounting file system.");
         return;
-    }
-
-    // reset config
-    if (resetConfig && SPIFFS.exists("/config.json"))
-    {
-        if (SPIFFS.remove("/config.json"))
-            Serial.println("!!! CONFIG FILE DELETED! (remember to disable) ");
-        else
-            Serial.println("[ERROR] could not delete config.json");
     }
 
     // load existing config
@@ -293,7 +305,6 @@ void Device::initConfig()
     for (size_t i = 0; i < config.size(); i++)
         config[i]->wifi_parameter = new WiFiManagerParameter(config[i]->name, config[i]->default_value, config[i]->value, config[i]->size);
 
-
     Serial.println("==== Current config ====");
     for (size_t i = 0; i < config.size(); i++)
     {
@@ -303,8 +314,11 @@ void Device::initConfig()
 
 void Device::saveConfig()
 {
-    if (!MYIOT_SAVE_CONFIG) return;
+    // load config values from wifiparams
+    for (size_t i = 0; i < config.size(); i++)
+        strcpy(config[i]->value, config[i]->wifi_parameter->getValue());
 
+    // build json
     DynamicJsonBuffer jsonBuffer;
     JsonObject& json = jsonBuffer.createObject();
 
@@ -316,6 +330,7 @@ void Device::saveConfig()
         Serial.println("failed to open config file for writing");
     }
 
+    // save
     Serial.println("[Config] saving config: ");
     json.printTo(Serial);
     Serial.println("");
@@ -353,6 +368,12 @@ void Device::initWiFi()
     });
 }
 
+void Device::restart()
+{
+    Serial.println("Restarting device...");
+    ESP.restart();
+}
+
 void Device::reconnectWiFi()
 {
     if (WiFi.status() == WL_CONNECTED)
@@ -363,11 +384,8 @@ void Device::reconnectWiFi()
 
     if(!wifi_manager.autoConnect(getConfig("name")))
     {
-        Serial.println("[WiFi] managet autoConnect() timedout.");
-        Serial.println("Restarting device...");
-        delay(3000);
-        ESP.reset();
-        delay(6000);
+        Serial.println("[WiFi] autoConnect() timedout.");
+        restart();
     }
     else
     {
@@ -380,6 +398,22 @@ void Device::reconnectWiFi()
 
     if (status_led)
         digitalWrite(status_led, LOW);
+}
+
+void Device::startConfigPortal()
+{
+    wifi_manager.setConfigPortalTimeout(180);
+    auto success = wifi_manager.startConfigPortal(getConfig("name"));
+    if (success)
+    {
+        Serial.println("[ConfigPortal] success.");
+    }
+    else
+    {
+        Serial.println("[ConfigPortal] failed.");
+        restart();
+    }
+
 }
 
 void Device::reconnectMQTT()
@@ -441,9 +475,9 @@ void Device::mqttCallback(char* topic, byte* payload, unsigned int size)
     free(content);
 }
 
-void Device::publish(const char* topic, const char* payload)
+bool Device::publish(const char* topic, const char* payload)
 {
-    mqtt.publish(topic, payload);
+    return mqtt.publish(topic, payload);
 }
 
 void Device::publishInput(Input* input, bool retained)
@@ -459,10 +493,82 @@ void Device::publishInput(Input* input, bool retained)
     mqtt.publish(topic.c_str(), payload.c_str(), retained);
 }
 
+void Device::sendTelemetry()
+{
+    // build json
+    DynamicJsonBuffer jsonBuffer;
+    JsonObject& tele = jsonBuffer.createObject();
+
+    tele["uptime"] = (int)(millis() / 1000);
+
+    // wifi
+    JsonObject& wifi_json = tele.createNestedObject("wifi");
+    wifi_json["ip"] = WiFi.localIP().toString();
+    wifi_json["ssid"] = WiFi.SSID();
+    wifi_json["mac"] = WiFi.macAddress();
+    wifi_json["gateway"] = WiFi.gatewayIP().toString();
+    wifi_json["mask"] = WiFi.subnetMask().toString();
+    wifi_json["dns"] = WiFi.dnsIP().toString();
+
+
+    // config
+    JsonObject& config_json = tele.createNestedObject("config");
+    for (size_t i = 0; i < config.size(); i++)
+        config_json[config[i]->name] = config[i]->value;
+
+    // inputs
+    if (inputs.size() > 0)
+    {
+        JsonObject& input_json = tele.createNestedObject("input");
+        for (size_t i = 0; i < inputs.size(); i++)
+            input_json[inputs[i]->getName()] = inputs[i]->read_float ? inputs[i]->float_value : inputs[i]->value;
+    }
+
+    // outputs
+    if (outputs.size() > 0)
+    {
+        JsonObject& output_json = tele.createNestedObject("output");
+        for (size_t i = 0; i < outputs.size(); i++)
+            output_json[outputs[i]->name] = outputs[i]->pinValue();
+    }
+
+    // print
+    Serial.printf("[Telemetry] (%d bytes)\n", tele.measureLength());
+    tele.printTo(Serial);
+    Serial.println();
+
+    // error: content is too big
+    if (tele.measureLength() > MQTT_MAX_PACKET_SIZE)
+    {
+        Serial.printf("[Telemetry] content (%d bytes) exceeds MQTT_MAX_PACKET_SIZE of %d bytes. Change max packet size via 'build_flags = -DMQTT_MAX_PACKET_SIZE=256' on platformio.ini\n", tele.measureLength(), MQTT_MAX_PACKET_SIZE);
+        return;
+    }
+
+    // send
+    auto topic_size = 5 + strlen(getConfig("name"));
+    auto topic = new char[topic_size];
+    strcpy(topic, "tele/");
+    strcat(topic, getConfig("name"));
+
+    auto payload = new char[tele.measureLength()];
+    tele.printTo(payload, tele.measureLength());
+
+    if (!publish(topic, payload))
+        Serial.println("[Telemetry] publish failed");
+
+    free(payload);
+
+}
 
 // loop
 void Device::loop()
 {
+    // save config
+    if (MYIOT_SAVE_CONFIG)
+    {
+        saveConfig();
+    }
+
     // tickers
     for (size_t i = 0; i < tickers.size(); i++) {
         tickers[i]->loop();

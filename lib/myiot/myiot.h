@@ -56,12 +56,13 @@ class Device
     void mqttCallback(char* topic, byte* payload, unsigned int size);
   public:
 
-    bool resetConfig;
-
     Device(String model);
 
     void setup();
     void loop();
+
+    void restart();
+    void startConfigPortal();
 
     void setStatusLED(uint8_t pin)
     {
@@ -72,6 +73,7 @@ class Device
     void addConfig(const char* name, size_t size, const char* default_value);
     char* getConfig(const char* name);
     void setConfig(const char*, const char* value);
+    void resetConfig();
 
     Ticker* addTicker(unsigned long interval, std::function<void()> callback);
 
@@ -84,13 +86,15 @@ class Device
     Output* addOutput(const char* name, uint8_t pin);
     Output* output(const char* name);
 
-    void publish(const char* topic, const char* payload);
+    bool publish(const char* topic, const char* payload);
     void subscribe(const char* topic, mqtt_subscription_callback callback);
     bool hasSubscription(const char* topic);
 
     void addCommand(const String &name, mqtt_subscription_callback callback);
     void runCommand(const String &name, const char* payload = NULL);
     bool hasCommand(const String &name);
+
+    void sendTelemetry();
 
 
 }; // Device
